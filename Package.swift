@@ -3,7 +3,7 @@ import PackageDescription
 
 // speech-core: the hearing layer interpreter-forge and companion-forge share.
 // Pieces move here one at a time, each as its own minor tag. ObjCExceptions
-// is 0.1.0. SileroVAD is 0.2.0.
+// is 0.1.0. SileroVAD is 0.2.0. SampleBuffer is 0.3.0.
 //
 // NSException and the ONNX Runtime binary exist only on Apple platforms. The
 // host that evaluates this manifest is what decides: a Mac builds those
@@ -38,6 +38,7 @@ let package = Package(
     products: [
         .library(name: "ObjCExceptions", targets: ["ObjCExceptions"]),
         .library(name: "SileroVAD", targets: ["SileroVAD"]),
+        .library(name: "SampleBuffer", targets: ["SampleBuffer"]),
     ],
     dependencies: dependencies,
     targets: [
@@ -52,5 +53,8 @@ let package = Package(
             exclude: ["make_fixture.py"],
             resources: [.copy("Fixtures")]
         ),
+        // 16 kHz mono samples. Plain Swift, so the same target builds everywhere.
+        .target(name: "SampleBuffer"),
+        .testTarget(name: "SampleBufferTests", dependencies: ["SampleBuffer"]),
     ]
 )
