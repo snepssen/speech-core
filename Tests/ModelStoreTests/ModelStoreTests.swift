@@ -61,19 +61,21 @@ final class ModelStoreTests: XCTestCase {
         XCTAssertEqual(store.location(of: model, in: [folder])?.path, folder.path)
     }
 
-    func testByteCountFollowsALinkAndIsNilWhenMissing() throws {
+    func testByteCountFollowsADirectoryLinkAndIsNilWhenMissing() throws {
         let root = try scratch()
         defer { try? FileManager.default.removeItem(at: root) }
-        let file = root.appending(path: "weights")
+        let file = root.appending(path: "shared/m/weights")
         try write(Data("gemma-weights".utf8), to: file)
         let link = root.appending(path: "linked")
-        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
-        XCTAssertEqual(ModelStore.byteCount(link), ModelStore.byteCount(file))
+        try FileManager.default.createSymbolicLink(
+            at: link, withDestinationURL: file.deletingLastPathComponent().deletingLastPathComponent())
+        let through = link.appending(path: "m/weights")
+        XCTAssertEqual(ModelStore.byteCount(through), ModelStore.byteCount(file))
         XCTAssertEqual(ModelStore.byteCount(file), Int64("gemma-weights".utf8.count))
         XCTAssertNil(ModelStore.byteCount(root.appending(path: "absent")))
         let broken = root.appending(path: "broken")
         try FileManager.default.createSymbolicLink(at: broken, withDestinationURL: root.appending(path: "gone"))
-        XCTAssertNil(ModelStore.byteCount(broken))
+        XCTAssertNil(ModelStore.byteCount(broken.appending(path: "m/weights")))
     }
 
     func testIsLinkSeesABrokenLinkAndNotADirectory() throws {
