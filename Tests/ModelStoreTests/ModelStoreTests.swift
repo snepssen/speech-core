@@ -290,8 +290,15 @@ final class ModelStoreTests: XCTestCase {
         let sandbox = ["APP_SANDBOX_CONTAINER_ID": "com.snepssen.companion"]
         if let container = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: ModelStore.sharedAppGroup) {
+            let expected = container.appending(path: "models").standardizedFileURL.path
             let sandboxed = try ModelStore.sharedRoot(environment: sandbox, home: home)
-            XCTAssertEqual(sandboxed.path, container.appending(path: "models").path)
+            XCTAssertEqual(sandboxed.standardizedFileURL.path, expected)
+            XCTAssertTrue(sandboxed.path.contains(ModelStore.sharedAppGroup))
+            // Passing the group explicitly takes the same container on an
+            // unsandboxed Mac. Application Support stays private to the app.
+            let grouped = try ModelStore.sharedRoot(
+                appGroup: ModelStore.sharedAppGroup, environment: [:], home: home)
+            XCTAssertEqual(grouped.standardizedFileURL.path, expected)
         } else {
             XCTAssertThrowsError(try ModelStore.sharedRoot(environment: sandbox, home: home)) { error in
                 XCTAssertTrue(error.localizedDescription.contains(ModelStore.sharedAppGroup))
