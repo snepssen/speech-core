@@ -107,10 +107,12 @@ already uses, so `<id>/<file>` is unchanged. Linux uses
 missing file throws, and the message contains that file's path. The Release
 store does not download, move, or delete; the files are placed there by
 hand. A sandboxed app, which every iOS app is, does not see another app's
-Application Support. It uses the app group `group.com.snepssen.models`, and
-`sharedRoot()` throws, naming
-`~/Library/Group Containers/group.com.snepssen.models/models`, until that
-group is in the entitlements. Neither Mac app is sandboxed today.
+Application Support. It reads
+`~/Library/Group Containers/group.com.snepssen.models/models`. On a Mac,
+`containerURL` returns that path even before the entitlement is present; the
+app still cannot read it until the group is entitled. On iOS, `containerURL`
+is nil without the entitlement, and `sharedRoot()` throws until
+`group.com.snepssen.models` is added. Neither Mac app is sandboxed today.
 
 ## Later
 

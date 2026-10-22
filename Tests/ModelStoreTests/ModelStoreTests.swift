@@ -283,16 +283,14 @@ final class ModelStoreTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: home) }
         let root = try ModelStore.sharedRoot(environment: [:], home: home)
         XCTAssertTrue(root.path.hasSuffix("/Library/Application Support/snepssen/models"))
-        XCTAssertFalse(root.path.contains("Containers"))
-        let expected = home.appending(path: "Library/Group Containers/group.com.snepssen.models/models").path
-        XCTAssertThrowsError(try ModelStore.sharedRoot(
-            environment: ["APP_SANDBOX_CONTAINER_ID": "com.snepssen.companion"], home: home
-        )) { error in
-            XCTAssertEqual(
-                error.localizedDescription,
-                "Expected \(expected). Add group.com.snepssen.models to the entitlements. A sandboxed app's own Application Support is private, so it is not ~/Library/Application Support/snepssen/models."
-            )
-        }
+        XCTAssertFalse(root.path.contains("Group Containers"))
+        // macOS returns the group container even when the entitlement is absent.
+        // iOS returns nil, and sharedRoot throws; this runner is not iOS.
+        let sandboxed = try ModelStore.sharedRoot(
+            environment: ["APP_SANDBOX_CONTAINER_ID": "com.snepssen.companion"], home: home)
+        XCTAssertTrue(
+            sandboxed.path.hasSuffix("/Library/Group Containers/group.com.snepssen.models/models"),
+            sandboxed.path)
         #else
         throw XCTSkip("The Application Support layout is resolved on macOS.")
         #endif

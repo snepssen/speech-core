@@ -91,7 +91,9 @@ public struct ModelStore: Sendable {
     /// when that variable is unset. A sandboxed app (every iOS app, and a Mac
     /// app with `APP_SANDBOX_CONTAINER_ID`) gets
     /// `<group container>/models` for `appGroup`, or `sharedAppGroup` when
-    /// the group is omitted. This does not create the folder.
+    /// the group is omitted. On a Mac that URL is returned even before the
+    /// entitlement exists. On iOS it is nil until the group is entitled, and
+    /// this throws, naming the group. This does not create the folder.
     public static func sharedRoot(
         appGroup: String? = nil,
         environment: [String: String] = ProcessInfo.processInfo.environment,
