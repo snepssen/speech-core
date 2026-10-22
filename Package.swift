@@ -3,7 +3,8 @@ import PackageDescription
 
 // speech-core: the hearing layer interpreter-forge and companion-forge share.
 // Pieces move here one at a time, each as its own minor tag. ObjCExceptions
-// is 0.1.0. SileroVAD is 0.2.0. SampleBuffer is 0.3.0. ModelStore is 0.4.0.
+// is 0.1.0. SileroVAD is 0.2.0. SampleBuffer is 0.3.0. ModelStore is 0.4.0,
+// and its shared folder is 0.4.1.
 //
 // NSException and the ONNX Runtime binary exist only on Apple platforms. The
 // host that evaluates this manifest is what decides: a Mac builds those

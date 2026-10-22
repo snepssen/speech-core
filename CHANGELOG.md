@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.1
+
+`ModelStore` can read one shared folder. On an unsandboxed Mac that is
+`~/Library/Application Support/snepssen/models`. On Linux it is
+`$XDG_DATA_HOME/snepssen/models`, or `~/.local/share/snepssen/models`. A
+sandboxed app uses the app group `group.com.snepssen.models`. A Release
+store reads that folder and no checkout path, and it does not download,
+move, or delete. A missing file is named by its path. The 0.4.0 initializer
+is unchanged.
+
 ## 0.4.0
 
 `ModelStore`. Locating a pinned model, checking each file's size, and fetching

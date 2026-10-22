@@ -200,4 +200,113 @@ final class ModelStoreTests: XCTestCase {
         XCTAssertTrue(ModelStore.isLink(link))
         XCTAssertEqual(try Data(contentsOf: target.appending(path: "weights")), Data([9]))
     }
+
+    func testReleaseStoreNamesEveryMissingFileAndDoesNotCreateIt() async throws {
+        let root = try scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let shared = root.appending(path: "shared")
+        let checkout = root.appending(path: "checkout")
+        let model = Fixture(id: "m", files: [.init(name: "weights", size: 3), .init(name: "sub/config", size: 2)])
+        try write(Data([1, 2, 3]), to: checkout.appending(path: "m/weights"))
+        try write(Data([1, 2]), to: checkout.appending(path: "m/sub/config"))
+        let store = ModelStore.release(at: shared)
+        XCTAssertTrue(store.readOnly)
+        XCTAssertNil(store.location(of: model))
+        let folder = shared.appending(path: "m")
+        let expected = "m is not at \(folder.path). Expected \(folder.appending(path: "weights").path) (3 bytes, found nothing); \(folder.appending(path: "sub/config").path) (2 bytes, found nothing)."
+        XCTAssertThrowsError(try store.require(model)) { error in
+            XCTAssertEqual(error.localizedDescription, expected)
+        }
+        do {
+            _ = try await store.download(model) { _ in XCTFail("a release store does not fetch") }
+            XCTFail("the missing model should be named")
+        } catch {
+            XCTAssertEqual(error.localizedDescription, expected)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+        XCTAssertEqual(ModelStore.byteCount(checkout.appending(path: "m/weights")), 3)
+    }
+
+    func testReleaseStoreKeepsACompleteCopyAndLeavesItInPlace() async throws {
+        let root = try scratch()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let shared = root.appending(path: "shared")
+        let model = Fixture(id: "m", files: [.init(name: "weights", size: 3), .init(name: "config", size: 2)])
+        try write(Data([1, 2, 3]), to: shared.appending(path: "m/weights"))
+        try write(Data([9]), to: shared.appending(path: "m/config"))
+        let store = ModelStore.release(at: shared)
+        let folder = shared.appending(path: "m")
+        XCTAssertThrowsError(try store.require(model)) { error in
+            XCTAssertEqual(
+                error.localizedDescription,
+                "m is not at \(folder.path). Expected \(folder.appending(path: "config").path) (2 bytes, found 1 bytes)."
+            )
+        }
+        try write(Data([1, 2]), to: shared.appending(path: "m/config"))
+        XCTAssertEqual(try store.require(model).path, folder.path)
+        XCTAssertFalse(store.isDeletable(model))
+        XCTAssertThrowsError(try store.delete(model)) { error in
+            XCTAssertEqual(error.localizedDescription, "\(folder.path) was left as it is.")
+        }
+        XCTAssertEqual(ModelStore.byteCount(folder.appending(path: "weights")), 3)
+        let found = try await store.download(model) { _ in XCTFail("a complete copy is not fetched") }
+        XCTAssertEqual(found.path, folder.path)
+    }
+
+    func testSharedRootOnLinuxFollowsXDGAndDoesNotCreateTheFolder() throws {
+        #if os(Linux)
+        let home = try scratch()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let plain = try ModelStore.sharedRoot(environment: [:], home: home)
+        XCTAssertEqual(plain.path, home.appending(path: ".local/share/snepssen/models").path)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: plain.path))
+        let custom = home.appending(path: "xdg")
+        let rooted = try ModelStore.sharedRoot(environment: ["XDG_DATA_HOME": custom.path], home: home)
+        XCTAssertEqual(rooted.path, custom.appending(path: "snepssen/models").path)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: rooted.path))
+        let empty = try ModelStore.sharedRoot(environment: ["XDG_DATA_HOME": ""], home: home)
+        XCTAssertEqual(empty.path, plain.path)
+        XCTAssertThrowsError(try ModelStore.sharedRoot(appGroup: "group.com.snepssen.models", environment: [:], home: home)) { error in
+            XCTAssertEqual(
+                error.localizedDescription,
+                "group.com.snepssen.models is an Apple app group. On this system the shared folder is \(plain.path)."
+            )
+        }
+        #else
+        throw XCTSkip("The XDG layout is resolved on Linux.")
+        #endif
+    }
+
+    func testSharedRootOnMacUsesApplicationSupportUntilSandboxed() throws {
+        #if os(macOS)
+        let home = try scratch()
+        defer { try? FileManager.default.removeItem(at: home) }
+        let root = try ModelStore.sharedRoot(environment: [:], home: home)
+        XCTAssertTrue(root.path.hasSuffix("/Library/Application Support/snepssen/models"))
+        XCTAssertFalse(root.path.contains("Group Containers"))
+        // A Mac returns the group container even when this process has no
+        // entitlement. iOS returns nil, and sharedRoot throws; the message
+        // then names the group. This runner is a Mac.
+        let sandbox = ["APP_SANDBOX_CONTAINER_ID": "com.snepssen.companion"]
+        if let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: ModelStore.sharedAppGroup) {
+            let expected = container.appending(path: "models").standardizedFileURL.path
+            let sandboxed = try ModelStore.sharedRoot(environment: sandbox, home: home)
+            XCTAssertEqual(sandboxed.standardizedFileURL.path, expected)
+            XCTAssertTrue(sandboxed.path.contains(ModelStore.sharedAppGroup))
+            // Passing the group explicitly takes the same container on an
+            // unsandboxed Mac. Application Support stays private to the app.
+            let grouped = try ModelStore.sharedRoot(
+                appGroup: ModelStore.sharedAppGroup, environment: [:], home: home)
+            XCTAssertEqual(grouped.standardizedFileURL.path, expected)
+        } else {
+            XCTAssertThrowsError(try ModelStore.sharedRoot(environment: sandbox, home: home)) { error in
+                XCTAssertTrue(error.localizedDescription.contains(ModelStore.sharedAppGroup))
+                XCTAssertTrue(error.localizedDescription.contains("entitlements"))
+            }
+        }
+        #else
+        throw XCTSkip("The Application Support layout is resolved on macOS.")
+        #endif
+    }
 }
