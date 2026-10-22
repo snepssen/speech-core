@@ -3,7 +3,8 @@
 The hearing layer of Velvet's workshop, shared by
 [interpreter-forge](https://github.com/snepssen/interpreter-forge) and
 [companion-forge](https://github.com/snepssen/companion-forge): the microphone
-and the speaker, voice detection, speech recognition and the model store.
+and the speaker, voice detection, speech recognition and the model store,
+and the language model's prompt cache that both apps reuse between calls.
 
 Each app carried its own copy. The copies move here one piece at a time, and
 each piece is its own release. The apps take that version in the same change.
@@ -114,20 +115,41 @@ app still cannot read it until the group is entitled. On iOS, `containerURL`
 is nil without the entitlement, and `sharedRoot()` throws until
 `group.com.snepssen.models` is added. Neither Mac app is sandboxed today.
 
-## Later
+`PromptCache`, for 0.5.0. An MLX attention cache and the tokens it holds,
+kept between calls whose prompts share a prefix, so a call reads only what
+changed. `prepare(for:)` trims the cache back to what the new prompt shares
+with what is held and returns the tokens still to read: always at least one,
+so the model has a position to answer from. `settle(_:)` records what the
+cache holds after the call and trims what was generated past it.
 
-Still in the apps, to move once both have settled on one version:
+A sliding-window cache (Gemma) cannot be trimmed once its ring has wrapped.
+`keep(_:)` stores a copy of the cache at a point the next prompt will share,
+and a trim that fails restarts from that copy when the prompt begins with it.
+Otherwise it starts from nothing, never from stale tokens. `cannotRewind`
+says whether the cache is that kind.
 
-- PromptCache
+```swift
+var cache = try PromptCache(context.model)
+let fresh = try cache.prepare(for: prompt)
+// … run the model on `fresh` with `cache.kv` …
+cache.settle(prompt)
+cache.keep(Array(prompt.prefix(stable)))
+```
+
+Both apps carried this; companion-forge's copy, with the snapshot, is the one
+that moved. It depends on mlx-swift-lm's `MLXLMCommon`, from 3.32.3, the
+version both apps build with. MLX exists on Apple platforms only; elsewhere
+the product is an empty module. The tests run on macOS (`swift test`) with
+stand-in caches, and never load a model.
 
 ## Use
 
-macOS 14 and iOS 17, as the apps declare. 0.4.1 is the tag to cut once this
+macOS 14 and iOS 17, as the apps declare. 0.5.0 is the tag to cut once this
 is on main. `ObjCExceptions` is 0.1.0, `SileroVAD` is 0.2.0, `SampleBuffer`
-is 0.3.0, and `ModelStore` is 0.4.0.
+is 0.3.0, `ModelStore` is 0.4.0, and `PromptCache` is 0.5.0.
 
 ```swift
-.package(url: "https://github.com/snepssen/speech-core", from: "0.4.1"),
+.package(url: "https://github.com/snepssen/speech-core", from: "0.5.0"),
 ```
 
 ```swift
@@ -135,6 +157,7 @@ is 0.3.0, and `ModelStore` is 0.4.0.
 .product(name: "SileroVAD", package: "speech-core"),
 .product(name: "SampleBuffer", package: "speech-core"),
 .product(name: "ModelStore", package: "speech-core"),
+.product(name: "PromptCache", package: "speech-core"),
 ```
 
 `NSException` exists only on Apple platforms. The tests that raise one run on
@@ -146,4 +169,5 @@ MIT, copyright 2026 snepssen. See `LICENSE`.
 
 SileroVAD loads models through ONNX Runtime on Apple platforms. That
 package is MIT, copyright Microsoft Corporation, and is not part of this
-copyright. Its notice is in `THIRD_PARTY_NOTICES.md`.
+copyright. PromptCache depends on mlx-swift-lm on Apple platforms, MIT,
+copyright ml-explore. Their notices are in `THIRD_PARTY_NOTICES.md`.
