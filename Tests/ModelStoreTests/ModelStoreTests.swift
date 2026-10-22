@@ -284,13 +284,20 @@ final class ModelStoreTests: XCTestCase {
         let root = try ModelStore.sharedRoot(environment: [:], home: home)
         XCTAssertTrue(root.path.hasSuffix("/Library/Application Support/snepssen/models"))
         XCTAssertFalse(root.path.contains("Group Containers"))
-        // macOS returns the group container even when the entitlement is absent.
-        // iOS returns nil, and sharedRoot throws; this runner is not iOS.
-        let sandboxed = try ModelStore.sharedRoot(
-            environment: ["APP_SANDBOX_CONTAINER_ID": "com.snepssen.companion"], home: home)
-        XCTAssertTrue(
-            sandboxed.path.hasSuffix("/Library/Group Containers/group.com.snepssen.models/models"),
-            sandboxed.path)
+        // A Mac returns the group container even when this process has no
+        // entitlement. iOS returns nil, and sharedRoot throws; the message
+        // then names the group. This runner is a Mac.
+        let sandbox = ["APP_SANDBOX_CONTAINER_ID": "com.snepssen.companion"]
+        if let container = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: ModelStore.sharedAppGroup) {
+            let sandboxed = try ModelStore.sharedRoot(environment: sandbox, home: home)
+            XCTAssertEqual(sandboxed.path, container.appending(path: "models").path)
+        } else {
+            XCTAssertThrowsError(try ModelStore.sharedRoot(environment: sandbox, home: home)) { error in
+                XCTAssertTrue(error.localizedDescription.contains(ModelStore.sharedAppGroup))
+                XCTAssertTrue(error.localizedDescription.contains("entitlements"))
+            }
+        }
         #else
         throw XCTSkip("The Application Support layout is resolved on macOS.")
         #endif
