@@ -3,19 +3,33 @@ import PackageDescription
 
 // speech-core: the hearing layer interpreter-forge and companion-forge share.
 // Pieces move here one at a time, each as its own minor tag. ObjCExceptions
-// is the first (0.1.0).
+// is 0.1.0. SileroVAD is 0.2.0.
 //
-// NSException exists only on Apple platforms. The host that evaluates this
-// manifest is what decides: a Mac builds the Objective-C target (and can
-// cross-compile it for iOS), and anywhere else the same product is an empty
-// Swift module so `swift build` still succeeds.
+// NSException and the ONNX Runtime binary exist only on Apple platforms. The
+// host that evaluates this manifest is what decides: a Mac builds those
+// targets (and can cross-compile them for iOS), and anywhere else the same
+// products are empty Swift modules so `swift build` still succeeds.
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
 let objcExceptions: Target = .target(name: "ObjCExceptions")
+let sileroVAD: Target = .target(
+    name: "SileroVAD",
+    dependencies: [
+        .product(name: "onnxruntime", package: "onnxruntime-swift-package-manager"),
+    ]
+)
+let dependencies: [Package.Dependency] = [
+    .package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", from: "1.20.0"),
+]
 #else
 let objcExceptions: Target = .target(
     name: "ObjCExceptions",
     path: "Sources/ObjCExceptionsLinux"
 )
+let sileroVAD: Target = .target(
+    name: "SileroVAD",
+    path: "Sources/SileroVADLinux"
+)
+let dependencies: [Package.Dependency] = []
 #endif
 
 let package = Package(
@@ -23,10 +37,20 @@ let package = Package(
     platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
         .library(name: "ObjCExceptions", targets: ["ObjCExceptions"]),
+        .library(name: "SileroVAD", targets: ["SileroVAD"]),
     ],
+    dependencies: dependencies,
     targets: [
         // NSException to NSError, for AVAudioEngine, which raises instead of throwing.
         objcExceptions,
         .testTarget(name: "ObjCExceptionsTests", dependencies: ["ObjCExceptions"]),
+        // Silero VAD v5. The weights stay with the app; this loads them.
+        sileroVAD,
+        .testTarget(
+            name: "SileroVADTests",
+            dependencies: ["SileroVAD"],
+            exclude: ["make_fixture.py"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )
