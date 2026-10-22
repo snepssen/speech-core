@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0
+
+`ModelStore`. Locating a pinned model, checking each file's size, and fetching
+what is missing from its Hugging Face revision. Each app keeps its own folder.
+A symlink counts as the file it names, and can be left in place instead of
+written through.
+
 ## 0.3.0
 
 `SampleBuffer`. The 16 kHz mono window both apps keep: stream indices that
