@@ -53,11 +53,68 @@ public struct ModelStore: Sendable {
     public let alsoSearching: [URL]
     /// When set, a symlink at `directory/<id>` is never written through.
     public let leaveLinks: Bool
+    /// A Release store. It does not download, move, or delete.
+    public let readOnly: Bool
+
+    /// The app group a sandboxed Release build uses to share models.
+    /// Both apps add `group.com.snepssen.models` before this can open.
+    public static let sharedAppGroup = "group.com.snepssen.models"
 
     public init(directory: URL, alsoSearching: [URL] = [], leaveLinks: Bool = false) {
         self.directory = directory
         self.alsoSearching = alsoSearching
         self.leaveLinks = leaveLinks
+        self.readOnly = false
+    }
+
+    /// Release builds read only `root/<id>`. Nothing is downloaded, moved, or
+    /// deleted. The app chooses this with its own `#if DEBUG`: a package
+    /// cannot see the app's DEBUG flag. Debug builds and command-line checks
+    /// keep the initializer above, including a checkout path.
+    public static func release(at root: URL) -> ModelStore {
+        ModelStore(reading: root)
+    }
+
+    private init(reading root: URL) {
+        directory = root
+        alsoSearching = []
+        leaveLinks = true
+        readOnly = true
+    }
+
+    /// The folder Release builds share.
+    ///
+    /// An unsandboxed Mac app gets `~/Library/Application Support/snepssen/models`.
+    /// The name is the workshop's, not either app's, and `models` is the same
+    /// directory name a checkout already uses. Linux uses
+    /// `$XDG_DATA_HOME/snepssen/models`, or `~/.local/share/snepssen/models`
+    /// when that variable is unset. A sandboxed app (every iOS app, and a Mac
+    /// app with `APP_SANDBOX_CONTAINER_ID`) gets
+    /// `<group container>/models` for `appGroup`, or `sharedAppGroup` when
+    /// the group is omitted. This does not create the folder.
+    public static func sharedRoot(
+        appGroup: String? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        home: URL = FileManager.default.homeDirectoryForCurrentUser
+    ) throws -> URL {
+        #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+        let sandboxed = appleSandboxed(environment)
+        if sandboxed || appGroup != nil {
+            let group = appGroup ?? sharedAppGroup
+            guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) else {
+                throw Failure(missingGroup(group, home: home))
+            }
+            return container.appending(path: "models")
+        }
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appending(path: "snepssen/models")
+        #else
+        if let appGroup {
+            let root = linuxSharedRoot(environment: environment, home: home)
+            throw Failure("\(appGroup) is an Apple app group. On this system the shared folder is \(root.path).")
+        }
+        return linuxSharedRoot(environment: environment, home: home)
+        #endif
     }
 
     /// Where `model` is, if every pinned file is there at its size.
@@ -74,9 +131,20 @@ public struct ModelStore: Sendable {
 
     public func isDownloaded(_ model: some StoredModel) -> Bool { location(of: model) != nil }
 
+    /// The model directory under `directory`, when every pinned file is there
+    /// at its size. A missing or wrong-sized file throws, and the message
+    /// names that file's path. `alsoSearching` is not consulted.
+    public func require(_ model: some StoredModel) throws -> URL {
+        let folder = directory.appending(path: model.id)
+        let wrong = model.files.filter { Self.byteCount(folder.appending(path: $0.name)) != $0.size }
+        guard wrong.isEmpty else { throw Failure(missing(model, folder: folder, wrong: wrong)) }
+        return folder
+    }
+
     /// Downloaded into this app's storage, so the app can delete it. A copy
     /// found only under `alsoSearching` belongs to whoever put it there.
-    public func isDeletable(_ model: some StoredModel) -> Bool { used(model) > 0 }
+    /// A Release store never offers deletion.
+    public func isDeletable(_ model: some StoredModel) -> Bool { !readOnly && used(model) > 0 }
 
     /// Bytes of this model under `directory`. Missing files contribute nothing.
     public func used(_ model: some StoredModel) -> Int64 {
@@ -88,6 +156,9 @@ public struct ModelStore: Sendable {
     /// gone, is left as it is. `alsoSearching` is never removed.
     public func delete(_ model: some StoredModel) throws {
         let folder = directory.appending(path: model.id)
+        if readOnly {
+            throw Failure("\(folder.path) was left as it is.")
+        }
         if FileManager.default.fileExists(atPath: folder.path) {
             try FileManager.default.removeItem(at: folder)
         }
@@ -100,6 +171,7 @@ public struct ModelStore: Sendable {
     public func download(
         _ model: some StoredModel, progress: @escaping @Sendable (Double) -> Void
     ) async throws -> URL {
+        if readOnly { return try require(model) }
         if let found = location(of: model) { return found }
         let folder = directory.appending(path: model.id)
         if leaveLinks, Self.isLink(folder) {
@@ -154,6 +226,45 @@ public struct ModelStore: Sendable {
         // mode_t and the S_IF* macros differ in width between Darwin and Glibc.
         return linked && (Int(info.st_mode) & Int(S_IFMT)) == Int(S_IFLNK)
     }
+
+    private func missing(_ model: some StoredModel, folder: URL, wrong: [ModelFile]) -> String {
+        let parts = wrong.map { file -> String in
+            let url = folder.appending(path: file.name)
+            let found = Self.byteCount(url).map { "\($0) bytes" } ?? "nothing"
+            return "\(url.path) (\(file.size) bytes, found \(found))"
+        }
+        return "\(model.id) is not at \(folder.path). Expected \(parts.joined(separator: "; "))."
+    }
+
+    #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+    private static func appleSandboxed(_ environment: [String: String]) -> Bool {
+        #if os(macOS)
+        environment["APP_SANDBOX_CONTAINER_ID"] != nil
+        #else
+        true
+        #endif
+    }
+
+    private static func missingGroup(_ group: String, home: URL) -> String {
+        #if os(macOS)
+        let expected = home.appending(path: "Library/Group Containers/\(group)/models").path
+        return "Expected \(expected). Add \(group) to the entitlements. A sandboxed app's own Application Support is private, so it is not ~/Library/Application Support/snepssen/models."
+        #else
+        _ = home
+        return "Expected the app group \(group) container's models directory. Add \(group) to the entitlements. A sandboxed app's Application Support is private to it."
+        #endif
+    }
+    #else
+    private static func linuxSharedRoot(environment: [String: String], home: URL) -> URL {
+        let base: URL
+        if let xdg = environment["XDG_DATA_HOME"], !xdg.isEmpty {
+            base = URL(fileURLWithPath: xdg, isDirectory: true)
+        } else {
+            base = home.appending(path: ".local/share")
+        }
+        return base.appending(path: "snepssen/models")
+    }
+    #endif
 }
 
 /// One file, with the bytes written so far reported as they arrive.

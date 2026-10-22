@@ -83,6 +83,35 @@ revision. It is plain Swift. Keeping the folder out of backup is Apple-only,
 because that flag is. The tests run on macOS and on Linux, and they never
 fetch a model.
 
+For 0.4.1 a Release build can read one shared folder and nothing else. The
+app chooses that with its own `#if DEBUG`. This package cannot see the app's
+flag. Debug builds, and the command-line checks, keep the initializer above.
+
+```swift
+#if DEBUG
+let store = ModelStore(
+    directory: support.appending(path: "Models"),
+    alsoSearching: [checkout.appending(path: "models")],
+    leaveLinks: true)
+#else
+let store = try ModelStore.release(at: ModelStore.sharedRoot())
+let folder = try store.require(model)
+#endif
+```
+
+On an unsandboxed Mac, `sharedRoot()` is
+`~/Library/Application Support/snepssen/models`. The workshop owns the
+folder, not either app, and `models` is the directory name a checkout
+already uses, so `<id>/<file>` is unchanged. Linux uses
+`$XDG_DATA_HOME/snepssen/models`, or `~/.local/share/snepssen/models`. A
+missing file throws, and the message contains that file's path. The Release
+store does not download, move, or delete; the files are placed there by
+hand. A sandboxed app, which every iOS app is, does not see another app's
+Application Support. It uses the app group `group.com.snepssen.models`, and
+`sharedRoot()` throws, naming
+`~/Library/Group Containers/group.com.snepssen.models/models`, until that
+group is in the entitlements. Neither Mac app is sandboxed today.
+
 ## Later
 
 Still in the apps, to move once both have settled on one version:
@@ -91,12 +120,12 @@ Still in the apps, to move once both have settled on one version:
 
 ## Use
 
-macOS 14 and iOS 17, as the apps declare. 0.4.0 is the tag to cut once this
-is on main. `ObjCExceptions` is 0.1.0, `SileroVAD` is 0.2.0, and
-`SampleBuffer` is 0.3.0.
+macOS 14 and iOS 17, as the apps declare. 0.4.1 is the tag to cut once this
+is on main. `ObjCExceptions` is 0.1.0, `SileroVAD` is 0.2.0, `SampleBuffer`
+is 0.3.0, and `ModelStore` is 0.4.0.
 
 ```swift
-.package(url: "https://github.com/snepssen/speech-core", from: "0.4.0"),
+.package(url: "https://github.com/snepssen/speech-core", from: "0.4.1"),
 ```
 
 ```swift
