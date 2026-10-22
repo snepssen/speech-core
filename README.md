@@ -60,26 +60,50 @@ buffer.drop(before: start)
 
 It is plain Swift, so the tests run on macOS and on Linux.
 
+`ModelStore`, for 0.4.0. Where an on-device model is, and the fetch when it
+is not. A model is present when every pinned file is there at its size. The
+app's own folder is searched first (`Application Support/Interpreter/Models`,
+`Application Support/Companion/Models`); further folders, such as a checkout's
+`models/`, count too and are never written. A symlink counts as the file it
+names. A store can refuse to write through a symlink that does not match, so
+a link laid down for development is left as it is.
+
+```swift
+let store = ModelStore(
+    directory: support.appending(path: "Models"),
+    alsoSearching: [checkout.appending(path: "models")],
+    leaveLinks: true)
+let folder = try await store.download(model) { fraction in }
+```
+
+The catalogue of models stays with the app, and so do the scripts that
+download or link those files into the folder. This package only reads the
+folder it is given, and fetches a missing file from its pinned Hugging Face
+revision. It is plain Swift. Keeping the folder out of backup is Apple-only,
+because that flag is. The tests run on macOS and on Linux, and they never
+fetch a model.
+
 ## Later
 
 Still in the apps, to move once both have settled on one version:
 
-- the model store
 - PromptCache
 
 ## Use
 
-macOS 14 and iOS 17, as the apps declare. 0.3.0 is the tag to cut once this
-is on main. `ObjCExceptions` is 0.1.0 and `SileroVAD` is 0.2.0.
+macOS 14 and iOS 17, as the apps declare. 0.4.0 is the tag to cut once this
+is on main. `ObjCExceptions` is 0.1.0, `SileroVAD` is 0.2.0, and
+`SampleBuffer` is 0.3.0.
 
 ```swift
-.package(url: "https://github.com/snepssen/speech-core", from: "0.3.0"),
+.package(url: "https://github.com/snepssen/speech-core", from: "0.4.0"),
 ```
 
 ```swift
 .product(name: "ObjCExceptions", package: "speech-core"),
 .product(name: "SileroVAD", package: "speech-core"),
 .product(name: "SampleBuffer", package: "speech-core"),
+.product(name: "ModelStore", package: "speech-core"),
 ```
 
 `NSException` exists only on Apple platforms. The tests that raise one run on
