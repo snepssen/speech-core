@@ -140,4 +140,10 @@ is 0.3.0, and `ModelStore` is 0.4.0.
 `NSException` exists only on Apple platforms. The tests that raise one run on
 macOS (`swift test`).
 
-GPL-3.0, as interpreter-forge, which this was taken from.
+## Licence
+
+MIT, copyright 2026 snepssen. See `LICENSE`.
+
+SileroVAD loads models through ONNX Runtime on Apple platforms. That
+package is MIT, copyright Microsoft Corporation, and is not part of this
+copyright. Its notice is in `THIRD_PARTY_NOTICES.md`.
