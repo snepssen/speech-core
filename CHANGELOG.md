@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.0
+
+`PromptCache`. An MLX attention cache reused across calls whose prompts share
+a prefix: trimmed back to what is shared, at least one token always read, and
+what was generated past the prompt trimmed after. A sliding-window cache that
+can no longer be trimmed restarts from a copy kept with `keep(_:)` when the
+prompt begins with it, and from nothing otherwise. Depends on mlx-swift-lm
+from 3.32.3 on Apple platforms; elsewhere the product is empty.
+
 ## 0.4.1
 
 `ModelStore` can read one shared folder. On an unsandboxed Mac that is
