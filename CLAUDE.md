@@ -17,3 +17,7 @@ The tag is cut after the piece has landed on main. Apps depend on it with
 `from:`, so the tag has to exist before their package resolve. This package's
 own check is `swift test` on macOS. The apps' checks are the ones that decide
 the move.
+
+Once a tag exists, each app's daily **dependencies** workflow (site-core's
+`update-dependency.yml`) moves it there after its own checks pass. A release
+that only changes this package needs no app PR.

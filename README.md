@@ -144,9 +144,15 @@ stand-in caches, and never load a model.
 
 ## Use
 
-macOS 14 and iOS 17, as the apps declare. 0.5.0 is the tag to cut once this
-is on main. `ObjCExceptions` is 0.1.0, `SileroVAD` is 0.2.0, `SampleBuffer`
-is 0.3.0, `ModelStore` is 0.4.0, and `PromptCache` is 0.5.0.
+macOS 14 and iOS 17, as the apps declare. `ObjCExceptions` is 0.1.0,
+`SileroVAD` is 0.2.0, `SampleBuffer` is 0.3.0, `ModelStore` is 0.4.0, and
+`PromptCache` is 0.5.0.
+
+A new tag reaches both apps within a day. Each one's **dependencies**
+workflow (site-core's `update-dependency.yml`) moves it to the newest
+speech-core and voice-core, runs its own checks, and pushes the new
+`Package.resolved` only if they pass. Start it by hand from the app's Actions
+tab to have it at once.
 
 ```swift
 .package(url: "https://github.com/snepssen/speech-core", from: "0.5.0"),
