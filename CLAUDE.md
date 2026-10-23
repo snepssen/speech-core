@@ -18,6 +18,10 @@ The tag is cut after the piece has landed on main. Apps depend on it with
 own check is `swift test` on macOS. The apps' checks are the ones that decide
 the move.
 
+To release: Actions → **release** → run, with a version; or, from a Mac with
+the apps and site-core checked out beside this one, `scripts/release.sh 0.6.0`,
+which also updates each app that passes its checks at once.
+
 Once a tag exists, each app's daily **dependencies** workflow (site-core's
 `update-dependency.yml`) moves it there after its own checks pass. A release
 that only changes this package needs no app PR.
