@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1
+
+`ModelStore` builds for iOS again. `sharedRoot`'s `home:` defaulted to
+`FileManager.default.homeDirectoryForCurrentUser`, which exists only on macOS
+and Linux, so every iOS build of a package depending on ModelStore failed to
+compile. It now defaults to `NSHomeDirectory()`. Nothing else changes, and CI
+builds every product for iOS as well as testing on macOS.
+
 ## 0.5.0
 
 `PromptCache`. An MLX attention cache reused across calls whose prompts share

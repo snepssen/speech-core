@@ -97,7 +97,11 @@ public struct ModelStore: Sendable {
     public static func sharedRoot(
         appGroup: String? = nil,
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        home: URL = FileManager.default.homeDirectoryForCurrentUser
+        // NSHomeDirectory, not FileManager.homeDirectoryForCurrentUser: the
+        // second exists only on macOS and Linux, and as a default argument it
+        // broke every iOS build of this package. On iOS this is the app's
+        // container, which is only used here to name an expected path.
+        home: URL = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
     ) throws -> URL {
         #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
         let sandboxed = appleSandboxed(environment)
