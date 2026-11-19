@@ -35,7 +35,7 @@ let promptCacheTests: [Target] = [
     ),
 ]
 let dependencies: [Package.Dependency] = [
-    .package(url: "https://github.com/microsoft/onnxruntime-swift-package-manager", from: "1.20.0"),
+    .package(url: "https://github.com/snepssen/onnxruntime-swift-package-manager", from: "1.20.0"),
     // The version both apps build with.
     .package(url: "https://github.com/ml-explore/mlx-swift-lm.git", from: "3.32.3"),
 ]
