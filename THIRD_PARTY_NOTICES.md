@@ -3,7 +3,7 @@
 speech-core's own code is MIT, copyright 2026 snepssen. See `LICENSE`.
 
 On Apple platforms, SileroVAD depends on ONNX Runtime through the Swift package
-[onnxruntime-swift-package-manager](https://github.com/microsoft/onnxruntime-swift-package-manager)
+[onnxruntime-swift-package-manager](https://github.com/snepssen/onnxruntime-swift-package-manager)
 1.20.0, which links
 [ONNX Runtime](https://github.com/microsoft/onnxruntime). Both are MIT, copyright Microsoft Corporation. This repository does not
 relicense them. Other platforms do not link the runtime.
