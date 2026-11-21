@@ -1,5 +1,5 @@
 {
-  "originHash" : "ae135a3826511c12c0892de433dfd7b08a936fd5bbb1c0d9fb741539f45c4b09",
+  "originHash" : "fc184947c669a86eb546a014c6373d7e965fede1032e944999c22c6ac54c37cc",
   "pins" : [
     {
       "identity" : "mlx-swift",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/snepssen/onnxruntime-swift-package-manager",
       "state" : {
-        "revision" : "b7fb7f7dea8a2469e6335d95a61b8f36d0dc83b2",
-        "version" : "1.24.2"
+        "revision" : "6b1858c2125532ced5ef668c7e41b278825020e4",
+        "version" : "1.24.3"
       }
     },
     {
